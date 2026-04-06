@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Africa Finance Observatory - WebGIS</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap"/>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;
+  --text:#e6edf3;--text2:#8b949e;--accent:#00e5a0;--accent2:#58a6ff;
+  --red:#f85149;--amber:#f59e0b;--purple:#a78bfa;--pink:#f472b6;
+  --sidebar-w:340px;--toolbar-h:52px;--status-h:28px;--panel-w:400px;
+  --radius:10px;--glass:rgba(22,27,34,.85);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--text2);}
+
+/* TOOLBAR */
+.toolbar{height:var(--toolbar-h);background:linear-gradient(135deg,#0d1117 0%,#161b22 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;z-index:1000;position:relative;}
+.toolbar .logo{display:flex;align-items:center;gap:10px;white-space:nowrap;}
+.toolbar .logo i{color:var(--accent);font-size:22px;}
+.toolbar .logo h1{font-size:16px;font-weight:700;letter-spacing:1px;}
+.toolbar .logo h1 span{color:var(--accent);}
+.toolbar .search-box{flex:1;max-width:360px;margin:0 auto;position:relative;}
+.toolbar .search-box input{width:100%;padding:8px 12px 8px 36px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none;transition:border .2s;}
+.toolbar .search-box input:focus{border-color:var(--accent);}
+.toolbar .search-box i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;}
+.toolbar .search-results{position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:0 0 8px 8px;max-height:240px;overflow-y:auto;display:none;z-index:2000;}
+.toolbar .search-results.active{display:block;}
+.toolbar .search-results .sr-item{padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;}
+.toolbar .search-results .sr-item:hover{background:var(--bg3);}
+.toolbar .search-results .sr-item .sr-region{color:var(--text2);font-size:11px;}
+.tool-btns{display:flex;gap:4px;align-items:center;}
+.tool-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;}
+.tool-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--accent);}
+.tool-btn.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+.tool-sep{width:1px;height:24px;background:var(--border);margin:0 4px;}
+.lang-btn{font-size:12px;font-weight:700;width:auto;padding:0 10px;letter-spacing:1px;}
+
+/* LAYOUT */
+.app{display:flex;height:calc(100vh - var(--toolbar-h) - var(--status-h));}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:margin .3s;overflow:hidden;z-index:500;}
+.sidebar.collapsed{margin-left:calc(-1 * var(--sidebar-w));}
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg);}
+.sidebar-tabs button{flex:1;padding:12px 0;border:none;background:transparent;color:var(--text2);cursor:pointer;font-size:15px;transition:all .2s;border-bottom:2px solid transparent;}
+.sidebar-tabs button:hover{color:var(--text);}
+.sidebar-tabs button.active{color:var(--accent);border-bottom-color:var(--accent);}
+.sidebar-content{flex:1;overflow-y:auto;overflow-x:hidden;}
+.tab-pane{display:none;padding:16px;}
+.tab-pane.active{display:block;}
+.tab-pane h3{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text2);margin-bottom:10px;font-weight:600;}
+.tab-pane h3:not(:first-child){margin-top:18px;}
+
+/* FORM CONTROLS */
+.ctrl-group{margin-bottom:14px;}
+.ctrl-label{font-size:11px;color:var(--text2);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.5px;}
+.ctrl-select{width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;cursor:pointer;outline:none;}
+.ctrl-select:focus{border-color:var(--accent);}
+.ctrl-range-wrap{display:flex;align-items:center;gap:10px;}
+.ctrl-range{flex:1;-webkit-appearance:none;height:6px;border-radius:3px;background:var(--bg3);outline:none;}
+.ctrl-range::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 6px rgba(0,229,160,.4);}
+.ctrl-range-val{font-size:14px;font-weight:700;color:var(--accent);min-width:40px;text-align:center;}
+.radio-group,.check-group{display:flex;flex-direction:column;gap:6px;}
+.radio-item,.check-item{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 8px;border-radius:6px;font-size:13px;transition:background .15s;}
+.radio-item:hover,.check-item:hover{background:var(--bg3);}
+.radio-item input,.check-item input{accent-color:var(--accent);}
+.btn{padding:8px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.btn:hover{background:var(--bg3);border-color:var(--accent);}
+.btn-accent{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600;}
+.btn-accent:hover{background:#00cc8e;}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* BASEMAP THUMBNAILS */
+.basemap-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.basemap-opt{border:2px solid var(--border);border-radius:8px;padding:6px;cursor:pointer;text-align:center;transition:all .2s;background:var(--bg);}
+.basemap-opt:hover{border-color:var(--text2);}
+.basemap-opt.active{border-color:var(--accent);background:rgba(0,229,160,.08);}
+.basemap-opt i{font-size:20px;display:block;margin-bottom:4px;color:var(--text2);}
+.basemap-opt.active i{color:var(--accent);}
+.basemap-opt span{font-size:10px;color:var(--text2);}
+
+/* LEGEND */
+.legend-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;}
+.legend-title{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;}
+.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:12px;}
+.legend-color{width:20px;height:14px;border-radius:3px;flex-shrink:0;}
+.legend-gradient{height:14px;border-radius:3px;width:100%;}
+.legend-range{display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-top:3px;}
+
+/* KPI CARDS */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.kpi-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;}
+.kpi-val{font-size:18px;font-weight:800;color:var(--accent);}
+.kpi-label{font-size:10px;color:var(--text2);margin-top:2px;line-height:1.2;}
+
+/* MINI CHART */
+.mini-chart-wrap{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:10px;}
+.mini-chart-wrap canvas{width:100%!important;height:160px!important;}
+
+/* MAP */
+.map-wrap{flex:1;position:relative;}
+#map{width:100%;height:100%;background:var(--bg);}
+.leaflet-control-zoom a{background:var(--bg2)!important;color:var(--text)!important;border-color:var(--border)!important;}
+.leaflet-control-zoom a:hover{background:var(--bg3)!important;}
+.leaflet-bar{border:1px solid var(--border)!important;border-radius:8px!important;overflow:hidden;}
+.leaflet-draw-toolbar a{background-color:var(--bg2)!important;color:var(--text)!important;border-color:var(--border)!important;}
+.leaflet-popup-content-wrapper{background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 32px rgba(0,0,0,.5)!important;}
+.leaflet-popup-tip{background:var(--bg2)!important;border:1px solid var(--border)!important;}
+.leaflet-popup-content{font-family:'Inter',sans-serif!important;font-size:13px!important;line-height:1.5!important;margin:12px 16px!important;}
+.popup-title{font-size:15px;font-weight:700;margin-bottom:6px;color:var(--accent);}
+.popup-region{font-size:11px;color:var(--text2);margin-bottom:8px;}
+.popup-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;}
+.popup-item{display:flex;justify-content:space-between;font-size:12px;}
+.popup-item .pk{color:var(--text2);}
+.popup-item .pv{font-weight:600;color:var(--text);}
+.popup-btn{margin-top:8px;width:100%;padding:6px;border-radius:6px;background:var(--accent);color:var(--bg);border:none;cursor:pointer;font-weight:600;font-size:12px;}
+.popup-btn:hover{background:#00cc8e;}
+
+/* HOME BUTTON */
+.leaflet-control-home{border:1px solid var(--border)!important;border-radius:8px!important;}
+.leaflet-control-home a{background:var(--bg2)!important;color:var(--text)!important;width:30px!important;height:30px!important;line-height:30px!important;text-align:center;display:block;text-decoration:none;font-size:14px;}
+.leaflet-control-home a:hover{background:var(--bg3)!important;}
+
+/* YEAR INDICATOR ON MAP */
+.year-display{position:absolute;top:10px;right:60px;z-index:800;background:var(--glass);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:10px;padding:8px 18px;pointer-events:none;}
+.year-display .yd-year{font-size:28px;font-weight:900;color:var(--accent);line-height:1;}
+.year-display .yd-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;}
+
+/* PLAYER */
+.player-bar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;}
+.player-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;}
+.player-btn:hover{background:var(--accent);color:var(--bg);}
+.player-btn.playing{background:var(--accent);color:var(--bg);}
+
+/* DETAIL PANEL */
+.detail-panel{width:0;overflow:hidden;background:var(--bg2);border-left:1px solid var(--border);transition:width .3s;z-index:500;display:flex;flex-direction:column;}
+.detail-panel.open{width:var(--panel-w);min-width:var(--panel-w);}
+.dp-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;}
+.dp-header h2{font-size:18px;font-weight:700;}
+.dp-header .dp-region{font-size:12px;color:var(--text2);margin-top:2px;}
+.dp-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.dp-close:hover{background:var(--bg3);color:var(--text);}
+.dp-body{flex:1;overflow-y:auto;padding:16px;}
+.dp-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+.dp-stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;}
+.dp-stat .ds-val{font-size:16px;font-weight:700;color:var(--accent);}
+.dp-stat .ds-label{font-size:10px;color:var(--text2);margin-top:2px;}
+.dp-chart{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;}
+.dp-chart h4{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.dp-chart canvas{width:100%!important;height:180px!important;}
+.dp-profile{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;}
+.dp-profile h4{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.dp-profile table{width:100%;font-size:12px;}
+.dp-profile table td{padding:4px 0;border-bottom:1px solid var(--border);}
+.dp-profile table td:first-child{color:var(--text2);}
+.dp-profile table td:last-child{text-align:right;font-weight:500;}
+
+/* TABLE MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-overlay.active{display:flex;}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:90vw;max-width:1100px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-header h3{font-size:16px;font-weight:700;}
+.modal-body{flex:1;overflow:auto;padding:16px;}
+.data-table{width:100%;border-collapse:collapse;font-size:12px;}
+.data-table th{position:sticky;top:0;background:var(--bg);padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.5px;cursor:pointer;white-space:nowrap;user-select:none;}
+.data-table th:hover{color:var(--accent);}
+.data-table td{padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.data-table tr:hover td{background:var(--bg3);}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+
+/* MEASURE TOOLTIP */
+.measure-tooltip{background:var(--glass)!important;backdrop-filter:blur(8px);border:1px solid var(--accent)!important;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;pointer-events:none;}
+.measure-tooltip::before{border-top-color:var(--accent)!important;}
+
+/* STATUS BAR */
+.status-bar{height:var(--status-h);background:var(--bg);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 16px;font-size:11px;color:var(--text2);gap:20px;z-index:1000;}
+.status-bar .sb-sep{width:1px;height:14px;background:var(--border);}
+.status-bar .sb-accent{color:var(--accent);font-weight:600;}
+
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+.loading-overlay.hidden{display:none;}
+.spinner{width:50px;height:50px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:14px;color:var(--text2);letter-spacing:1px;}
+
+/* QUERY FILTER */
+.query-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;}
+.query-row select,.query-row input{padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;outline:none;}
+.query-row input{width:70px;}
+.query-count{font-size:12px;color:var(--accent);font-weight:600;margin-top:4px;}
+
+/* PRINT */
+@media print{
+  .toolbar,.sidebar,.detail-panel,.status-bar,.modal-overlay,.year-display,.leaflet-control{display:none!important;}
+  .app{display:block!important;}
+  .map-wrap{width:100vw!important;height:100vh!important;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loader">
+  <div class="spinner"></div>
+  <div class="loading-text">AFRICA FINANCE WEBGIS</div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <button class="tool-btn" id="btnToggleSidebar" title="Side panel"><i class="fas fa-bars"></i></button>
+  <div class="logo">
+    <i class="fas fa-globe-africa"></i>
+    <h1>AFRICA <span>FINANCE</span> WebGIS</h1>
+  </div>
+  <div class="search-box">
+    <i class="fas fa-search"></i>
+    <input type="text" id="searchInput" placeholder="Search country..." autocomplete="off"/>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <div class="tool-btns">
+    <button class="tool-btn" id="btnMeasureDist" title="Measure distance"><i class="fas fa-ruler"></i></button>
+    <button class="tool-btn" id="btnMeasureArea" title="Measure area"><i class="fas fa-draw-polygon"></i></button>
+    <button class="tool-btn" id="btnClearMeasure" title="Clear measures"><i class="fas fa-eraser"></i></button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" id="btnTable" title="Attribute table"><i class="fas fa-table"></i></button>
+    <button class="tool-btn" id="btnPrint" title="Print"><i class="fas fa-print"></i></button>
+    <button class="tool-btn" id="btnExportGeo" title="Export GeoJSON"><i class="fas fa-download"></i></button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" id="btnFullscreen" title="Fullscreen"><i class="fas fa-expand"></i></button>
+    <button class="tool-btn lang-btn" id="btnLang">EN</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-tabs">
+      <button class="active" data-tab="tabLayers" title="Layers"><i class="fas fa-layer-group"></i></button>
+      <button data-tab="tabIndicators" title="Indicators"><i class="fas fa-sliders-h"></i></button>
+      <button data-tab="tabAnalytics" title="Analytics"><i class="fas fa-chart-line"></i></button>
+      <button data-tab="tabData" title="Data"><i class="fas fa-database"></i></button>
+    </div>
+    <div class="sidebar-content">
+
+      <!-- TAB: LAYERS -->
+      <div class="tab-pane active" id="tabLayers">
+        <h3 data-i18n="basemaps">Basemaps</h3>
+        <div class="basemap-grid" id="basemapGrid">
+          <div class="basemap-opt active" data-bm="dark"><i class="fas fa-moon"></i><span data-i18n="dark">Dark</span></div>
+          <div class="basemap-opt" data-bm="osm"><i class="fas fa-map"></i><span>OSM</span></div>
+          <div class="basemap-opt" data-bm="light"><i class="fas fa-sun"></i><span data-i18n="light">Light</span></div>
+          <div class="basemap-opt" data-bm="satellite"><i class="fas fa-satellite"></i><span>Satellite</span></div>
+        </div>
+        <h3 data-i18n="layers">Layers</h3>
+        <div class="check-group">
+          <label class="check-item"><input type="checkbox" id="chkBorders" checked/> <span data-i18n="borders">Borders</span></label>
+          <label class="check-item"><input type="checkbox" id="chkLabels"/> <span data-i18n="countryLabels">Country labels</span></label>
+          <label class="check-item"><input type="checkbox" id="chkCapitals"/> <span data-i18n="capitals">Capitals</span></label>
+          <label class="check-item"><input type="checkbox" id="chkCircles"/> <span data-i18n="propCircles">Proportional circles</span></label>
+          <label class="check-item"><input type="checkbox" id="chkHeatmap"/> <span data-i18n="heatmap">Heatmap</span></label>
+        </div>
+        <h3 data-i18n="opacity">Opacity</h3>
+        <div class="ctrl-range-wrap">
+          <input type="range" class="ctrl-range" id="opacityRange" min="0" max="100" value="75"/>
+          <span class="ctrl-range-val" id="opacityVal">75%</span>
+        </div>
+        <h3 data-i18n="drawing">Drawing</h3>
+        <div class="btn-row">
+          <button class="btn" id="btnDrawPoly"><i class="fas fa-draw-polygon"></i> <span data-i18n="polygon">Polygon</span></button>
+          <button class="btn" id="btnDrawLine"><i class="fas fa-minus"></i> <span data-i18n="line">Line</span></button>
+          <button class="btn" id="btnDrawMarker"><i class="fas fa-map-marker-alt"></i> <span data-i18n="point">Point</span></button>
+          <button class="btn" id="btnDrawClear"><i class="fas fa-trash"></i> <span data-i18n="clear">Clear</span></button>
+        </div>
+      </div>
+
+      <!-- TAB: INDICATORS -->
+      <div class="tab-pane" id="tabIndicators">
+        <h3 data-i18n="thematicInd">Thematic indicator</h3>
+        <div class="ctrl-group">
+          <select class="ctrl-select" id="indicatorSelect"></select>
+        </div>
+        <h3 data-i18n="year">Year</h3>
+        <div class="ctrl-group">
+          <div class="ctrl-range-wrap">
+            <input type="range" class="ctrl-range" id="yearRange" min="2000" max="2024" value="2024"/>
+            <span class="ctrl-range-val" id="yearVal">2024</span>
+          </div>
+        </div>
+        <div class="player-bar">
+          <button class="player-btn" id="btnPlayPrev" title="Previous"><i class="fas fa-step-backward"></i></button>
+          <button class="player-btn" id="btnPlay" title="Play"><i class="fas fa-play"></i></button>
+          <button class="player-btn" id="btnPlayNext" title="Next"><i class="fas fa-step-forward"></i></button>
+          <span style="font-size:11px;color:var(--text2);margin-left:auto;" id="playSpeed">1x</span>
+        </div>
+        <h3 data-i18n="classification">Classification</h3>
+        <div class="ctrl-group">
+          <select class="ctrl-select" id="classMethod">
+            <option value="quantile">Quantile</option>
+            <option value="equal" data-i18n-opt="equalInterval">Equal interval</option>
+            <option value="jenks" data-i18n-opt="naturalBreaks">Natural breaks</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label class="ctrl-label" data-i18n="nbClasses">Number of classes</label>
+          <div class="ctrl-range-wrap">
+            <input type="range" class="ctrl-range" id="nbClasses" min="3" max="7" value="5"/>
+            <span class="ctrl-range-val" id="nbClassesVal">5</span>
+          </div>
+        </div>
+        <div class="legend-box" id="legendBox">
+          <div class="legend-title" data-i18n="legend">Legend</div>
+          <div id="legendContent"></div>
+        </div>
+      </div>
+
+      <!-- TAB: ANALYTICS -->
+      <div class="tab-pane" id="tabAnalytics">
+        <h3 data-i18n="keyIndicators">Key indicators (2024)</h3>
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <h3 data-i18n="continentalTrend">Continental trend</h3>
+        <div class="mini-chart-wrap"><canvas id="chartContinent"></canvas></div>
+        <h3 data-i18n="top10">Top 10 countries</h3>
+        <div class="mini-chart-wrap"><canvas id="chartTop10"></canvas></div>
+        <h3 data-i18n="spatialFilter">Spatial filter</h3>
+        <div class="query-row">
+          <select class="ctrl-select" id="queryIndicator" style="flex:1;"></select>
+          <select class="ctrl-select" id="queryOp" style="width:50px;">
+            <option value="gt">&gt;</option>
+            <option value="lt">&lt;</option>
+            <option value="gte">&ge;</option>
+            <option value="lte">&le;</option>
+          </select>
+          <input type="number" id="queryVal" placeholder="val"/>
+          <button class="btn btn-accent" id="btnQuery" style="padding:6px 10px;"><i class="fas fa-filter"></i></button>
+        </div>
+        <div class="query-count" id="queryCount"></div>
+        <button class="btn" id="btnQueryClear" style="margin-top:6px;"><i class="fas fa-times"></i> <span data-i18n="reset">Reset</span></button>
+      </div>
+
+      <!-- TAB: DATA -->
+      <div class="tab-pane" id="tabData">
+        <h3 data-i18n="attrTable">Attribute table</h3>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px;" data-i18n="dataForYear">Data for selected year</p>
+        <div class="btn-row">
+          <button class="btn btn-accent" id="btnOpenTable"><i class="fas fa-table"></i> <span data-i18n="openTable">Open table</span></button>
+        </div>
+        <h3 data-i18n="export">Export</h3>
+        <div class="btn-row">
+          <button class="btn" id="btnExportCSV"><i class="fas fa-file-csv"></i> CSV</button>
+          <button class="btn" id="btnExportGeoJSON"><i class="fas fa-globe"></i> GeoJSON</button>
+        </div>
+        <h3 data-i18n="rankings">Rankings (2024)</h3>
+        <div class="ctrl-group">
+          <select class="ctrl-select" id="rankingSelect">
+            <option value="pib_hab">PIB/hab</option>
+            <option value="croissance">Croissance</option>
+            <option value="bancarisation">Bancarisation</option>
+            <option value="npl">NPL</option>
+            <option value="inflation">Inflation</option>
+            <option value="credit_pib">Credit/PIB</option>
+            <option value="score_inclusion">Inclusion</option>
+            <option value="dette">Dette</option>
+            <option value="fdi">FDI</option>
+            <option value="pop_mm">Mobile Money</option>
+          </select>
+        </div>
+        <div id="rankingContent" style="font-size:12px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="year-display" id="yearDisplay">
+      <div class="yd-label" data-i18n="year">Year</div>
+      <div class="yd-year" id="yearDisplayVal">2024</div>
+    </div>
+  </div>
+
+  <!-- DETAIL PANEL -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="dp-header">
+      <div>
+        <h2 id="dpCountry">--</h2>
+        <div class="dp-region" id="dpRegion">--</div>
+      </div>
+      <button class="dp-close" id="dpClose"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="dp-body">
+      <div class="dp-stats" id="dpStats"></div>
+      <div class="dp-chart">
+        <h4 id="dpChartTitle1">GDP and Growth</h4>
+        <canvas id="dpChart1"></canvas>
+      </div>
+      <div class="dp-chart">
+        <h4 id="dpChartTitle2">Banking and Mobile Money</h4>
+        <canvas id="dpChart2"></canvas>
+      </div>
+      <div class="dp-profile" id="dpProfile">
+        <h4 data-i18n="profile">Profile</h4>
+        <table id="dpProfileTable"></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <span><i class="fas fa-crosshairs" style="margin-right:4px;"></i> <span id="sbCoords">0.000, 0.000</span></span>
+  <span class="sb-sep"></span>
+  <span>Zoom: <span class="sb-accent" id="sbZoom">4</span></span>
+  <span class="sb-sep"></span>
+  <span>EPSG:4326</span>
+  <span class="sb-sep"></span>
+  <span><span class="sb-accent" id="sbFeatures">0</span> <span data-i18n="features">features</span></span>
+  <span style="margin-left:auto;"><i class="fas fa-globe-africa" style="color:var(--accent);margin-right:4px;"></i> Africa Finance Observatory</span>
+</div>
+
+<!-- TABLE MODAL -->
+<div class="modal-overlay" id="tableModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3><i class="fas fa-table" style="margin-right:8px;color:var(--accent);"></i> <span data-i18n="attrTable">Attribute table</span> - <span id="tableYear">2024</span></h3>
+      <button class="dp-close" id="tableClose"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <table class="data-table" id="dataTable">
+        <thead id="dataTableHead"></thead>
+        <tbody id="dataTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="tableExportCSV"><i class="fas fa-file-csv"></i> Export CSV</button>
+      <button class="btn" id="tableCloseBtn"><span data-i18n="close">Close</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- JS LIBS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+
+<script>
+/* ==========================================================
+   AFRICA FINANCE WEBGIS - Main Application
+   ========================================================== */
+
+// ── CONFIG ──────────────────────────────────────────────────
+const INDICATORS = {
+  pib_hab:        {fr:'PIB/hab ($)',en:'GDP/cap ($)',unit:'$',dec:0,palette:'green',range:[0,8000],better:'high'},
+  croissance_pib: {fr:'Croissance PIB (%)',en:'GDP Growth (%)',unit:'%',dec:1,palette:'diverge',range:[-5,12],better:'high'},
+  pib_mrd:        {fr:'PIB (Mrd $)',en:'GDP ($Bn)',unit:'Mrd$',dec:1,palette:'green',range:[0,500],better:'high'},
+  inflation:      {fr:'Inflation (%)',en:'Inflation (%)',unit:'%',dec:1,palette:'red',range:[0,30],better:'low'},
+  dette_publique: {fr:'Dette/PIB (%)',en:'Debt/GDP (%)',unit:'%',dec:1,palette:'red',range:[0,120],better:'low'},
+  bancarisation:  {fr:'Bancarisation (%)',en:'Banking Rate (%)',unit:'%',dec:1,palette:'purple',range:[0,100],better:'high'},
+  npl:            {fr:'NPL (%)',en:'NPL (%)',unit:'%',dec:1,palette:'red',range:[0,25],better:'low'},
+  car:            {fr:'CAR (%)',en:'CAR (%)',unit:'%',dec:1,palette:'green',range:[5,25],better:'high'},
+  roe:            {fr:'ROE (%)',en:'ROE (%)',unit:'%',dec:1,palette:'green',range:[-10,30],better:'high'},
+  credit_pib:     {fr:'Credit/PIB (%)',en:'Credit/GDP (%)',unit:'%',dec:1,palette:'blue',range:[0,100],better:'high'},
+  pop_mm:         {fr:'Mobile Money (% pop.)',en:'Mobile Money (% pop.)',unit:'%',dec:1,palette:'purple',range:[0,90],better:'high'},
+  score_inclusion:{fr:'Score Inclusion (0-10)',en:'Inclusion Score (0-10)',unit:'',dec:1,palette:'green',range:[0,10],better:'high'},
+  fdi_entrants:   {fr:'FDI (Mrd $)',en:'FDI ($Bn)',unit:'Mrd$',dec:2,palette:'blue',range:[0,15],better:'high'},
+  chomage:        {fr:'Chomage (%)',en:'Unemployment (%)',unit:'%',dec:1,palette:'red',range:[0,35],better:'low'},
+  par30:          {fr:'PAR30 (%)',en:'PAR30 (%)',unit:'%',dec:1,palette:'red',range:[0,20],better:'low'},
+  idh:            {fr:'IDH',en:'HDI',unit:'',dec:3,palette:'green',range:[0.3,0.8],better:'high'},
+};
+
+const PALETTES = {
+  green:  ['#0d1117','#0a3d2e','#0d6644','#00b377','#00e5a0','#66ffcc','#b3ffe6'],
+  red:    ['#00e5a0','#84cc16','#eab308','#f59e0b','#ef4444','#dc2626','#7f1d1d'],
+  blue:   ['#0d1117','#1a3a5c','#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd'],
+  purple: ['#0d1117','#1e1a3a','#4c1d95','#5b3cc4','#7c3aed','#8b5cf6','#c084fc'],
+  diverge:['#f85149','#f97066','#fca5a5','#d1d5db','#6ee7b7','#34d399','#00e5a0'],
+};
+
+const REGION_COLORS = {
+  'Afrique Australe':'#00e5a0','Afrique Centrale':'#a78bfa','Afrique du Nord':'#58a6ff',
+  'Afrique Occidentale':'#f59e0b','Afrique Orientale':'#f472b6'
+};
+
+const BASEMAPS = {
+  dark:     {url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',attr:'CartoDB'},
+  osm:      {url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',attr:'OpenStreetMap'},
+  light:    {url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',attr:'CartoDB'},
+  satellite:{url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',attr:'Esri'},
+};
+
+// ── I18N UI LABELS ──────────────────────────────────────────
+const UI_LABELS = {
+  basemaps:       {en:'Basemaps',fr:'Fonds de carte'},
+  dark:           {en:'Dark',fr:'Sombre'},
+  light:          {en:'Light',fr:'Clair'},
+  layers:         {en:'Layers',fr:'Couches'},
+  borders:        {en:'Borders',fr:'Frontières'},
+  countryLabels:  {en:'Country labels',fr:'Étiquettes pays'},
+  capitals:       {en:'Capitals',fr:'Capitales'},
+  propCircles:    {en:'Proportional circles',fr:'Cercles proportionnels'},
+  heatmap:        {en:'Heatmap',fr:'Carte de chaleur'},
+  opacity:        {en:'Opacity',fr:'Opacité'},
+  drawing:        {en:'Drawing',fr:'Dessin'},
+  polygon:        {en:'Polygon',fr:'Polygone'},
+  line:           {en:'Line',fr:'Ligne'},
+  point:          {en:'Point',fr:'Point'},
+  clear:          {en:'Clear',fr:'Effacer'},
+  thematicInd:    {en:'Thematic indicator',fr:'Indicateur thématique'},
+  year:           {en:'Year',fr:'Année'},
+  classification: {en:'Classification',fr:'Classification'},
+  equalInterval:  {en:'Equal interval',fr:'Intervalle égal'},
+  naturalBreaks:  {en:'Natural breaks',fr:'Seuils naturels'},
+  nbClasses:      {en:'Number of classes',fr:'Nombre de classes'},
+  legend:         {en:'Legend',fr:'Légende'},
+  keyIndicators:  {en:'Key indicators (2024)',fr:'Indicateurs clés (2024)'},
+  continentalTrend:{en:'Continental trend',fr:'Évolution continentale'},
+  top10:          {en:'Top 10 countries',fr:'Top 10 pays'},
+  spatialFilter:  {en:'Spatial filter',fr:'Filtre spatial'},
+  reset:          {en:'Reset',fr:'Réinitialiser'},
+  attrTable:      {en:'Attribute table',fr:'Table attributaire'},
+  dataForYear:    {en:'Data for selected year',fr:'Données pour l\'année sélectionnée'},
+  openTable:      {en:'Open table',fr:'Ouvrir la table'},
+  export:         {en:'Export',fr:'Exporter'},
+  rankings:       {en:'Rankings (2024)',fr:'Classements (2024)'},
+  profile:        {en:'Profile',fr:'Profil'},
+  features:       {en:'features',fr:'entités'},
+  close:          {en:'Close',fr:'Fermer'},
+};
+
+function updateI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key=el.getAttribute('data-i18n');
+    if(UI_LABELS[key]) el.textContent=UI_LABELS[key][lang]||UI_LABELS[key].en;
+  });
+  document.querySelectorAll('[data-i18n-opt]').forEach(el=>{
+    const key=el.getAttribute('data-i18n-opt');
+    if(UI_LABELS[key]) el.textContent=UI_LABELS[key][lang]||UI_LABELS[key].en;
+  });
+  // Update indicator selects
+  [$('indicatorSelect'),$('queryIndicator')].forEach(sel=>{
+    if(!sel) return;
+    sel.querySelectorAll('option').forEach(opt=>{
+      const cfg=INDICATORS[opt.value];
+      if(cfg) opt.textContent=cfg[lang]||cfg.en;
+    });
+  });
+  // Search placeholder
+  $('searchInput').placeholder=lang==='en'?'Search country...':'Rechercher un pays...';
+  // Detail panel chart titles
+  $('dpChartTitle1').textContent=lang==='en'?'GDP and Growth':'PIB et Croissance';
+  $('dpChartTitle2').textContent=lang==='en'?'Banking and Mobile Money':'Bancarisation et Mobile Money';
+  document.documentElement.lang=lang;
+}
+
+// ── STATE ───────────────────────────────────────────────────
+let lang = 'en';
+let geoData = null, finData = null;
+let map, choroLayer, labelsLayer, capitalsLayer, circlesLayer, heatLayer;
+let drawnItems, measureLayer, drawControl;
+let currentIndicator = 'pib_hab', currentYear = 2024;
+let playInterval = null, playSpeed = 1000;
+let continentChart = null, top10Chart = null, dpChart1 = null, dpChart2 = null;
+let queryHighlight = null;
+let currentSort = {col:null, asc:true};
+let measuring = false, measureMode = null, measurePoints = [];
+
+// ── HELPERS ─────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = (v,d=1) => v==null?'--':Number(v).toFixed(d);
+const fmtK = v => {
+  if(v==null) return '--';
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(1)+'K';
+  if(Math.abs(v)>=1) return v.toFixed(1);
+  return v.toFixed(2);
+};
+
+function lerp(a,b,t){return a+(b-a)*t;}
+function lerpColor(c1,c2,t){
+  const p=s=>{const n=parseInt(s,16);return[n>>16,(n>>8)&0xff,n&0xff];};
+  const [r1,g1,b1]=p(c1.slice(1)),[r2,g2,b2]=p(c2.slice(1));
+  const r=Math.round(lerp(r1,r2,t)),g=Math.round(lerp(g1,g2,t)),b=Math.round(lerp(b1,b2,t));
+  return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function getColor(value, palette, vmin, vmax){
+  if(value==null) return '#21262d';
+  const colors = PALETTES[palette];
+  const t = Math.max(0,Math.min(1,(value-vmin)/(vmax-vmin||1)));
+  const idx = t*(colors.length-1);
+  const lo = Math.floor(idx), hi = Math.min(lo+1,colors.length-1);
+  return lerpColor(colors[lo],colors[hi],idx-lo);
+}
+
+function classify(values, method, n){
+  const sorted = values.filter(v=>v!=null).sort((a,b)=>a-b);
+  if(!sorted.length) return [];
+  if(method==='equal'){
+    const mn=sorted[0],mx=sorted[sorted.length-1],step=(mx-mn)/n;
+    return Array.from({length:n+1},(_,i)=>mn+i*step);
+  }
+  if(method==='quantile'){
+    return Array.from({length:n+1},(_,i)=>{
+      const p=i/n,idx=Math.min(Math.floor(p*sorted.length),sorted.length-1);
+      return sorted[idx];
+    });
+  }
+  // jenks approximation using quantiles with adjustment
+  const breaks = Array.from({length:n+1},(_,i)=>{
+    const p=i/n,idx=Math.min(Math.floor(p*sorted.length),sorted.length-1);
+    return sorted[idx];
+  });
+  return breaks;
+}
+
+function getIsoFromFeature(feat){
+  const p=feat.properties;
+  let iso = p.ISO_A3 || p.ADM0_A3;
+  if(!iso||iso==='-99') iso=p.ADM0_A3;
+  if(!iso||iso==='-99') return null;
+  return iso;
+}
+
+function indLabel(key){return INDICATORS[key]?INDICATORS[key][lang]||INDICATORS[key].fr:key;}
+
+// ── MAP INIT ────────────────────────────────────────────────
+function initMap(){
+  map = L.map('map',{
+    center:[2,20],zoom:4,minZoom:2,maxZoom:12,zoomControl:false,
+    attributionControl:false
+  });
+
+  // Zoom control
+  L.control.zoom({position:'topright'}).addTo(map);
+
+  // Home button
+  const HomeControl = L.Control.extend({
+    options:{position:'topright'},
+    onAdd:function(){
+      const btn=L.DomUtil.create('div','leaflet-control-home leaflet-bar');
+      btn.innerHTML='<a href="#" title="Africa view"><i class="fas fa-home"></i></a>';
+      L.DomEvent.on(btn,'click',function(e){L.DomEvent.stop(e);map.setView([2,20],4);});
+      return btn;
+    }
+  });
+  new HomeControl().addTo(map);
+
+  // Basemap
+  map._basemapLayer = L.tileLayer(BASEMAPS.dark.url,{attribution:BASEMAPS.dark.attr,maxZoom:18}).addTo(map);
+
+  // Minimap
+  const miniTile = L.tileLayer(BASEMAPS.dark.url,{maxZoom:8});
+  new L.Control.MiniMap(miniTile,{position:'bottomleft',toggleDisplay:true,minimized:false,width:130,height:100}).addTo(map);
+
+  // Scale
+  L.control.scale({position:'bottomright',metric:true,imperial:false}).addTo(map);
+
+  // Attribution
+  L.control.attribution({position:'bottomright',prefix:false}).addTo(map);
+
+  // Draw layer
+  drawnItems = L.featureGroup().addTo(map);
+  measureLayer = L.featureGroup().addTo(map);
+
+  // Events
+  map.on('mousemove',function(e){
+    $('sbCoords').textContent = e.latlng.lat.toFixed(3)+', '+e.latlng.lng.toFixed(3);
+    if(measuring && measurePoints.length>0){
+      // update temp line
+    }
+  });
+  map.on('zoomend',function(){$('sbZoom').textContent=map.getZoom();});
+
+  // Layers
+  labelsLayer = L.layerGroup();
+  capitalsLayer = L.layerGroup();
+  circlesLayer = L.layerGroup();
+  heatLayer = null;
+}
+
+// ── DATA LOADING ────────────────────────────────────────────
+async function loadData(){
+  const [geoRes, finRes] = await Promise.all([
+    fetch('data/africa.geojson'),
+    fetch('data/indicators.json')
+  ]);
+  geoData = await geoRes.json();
+  finData = await finRes.json();
+  $('sbFeatures').textContent = geoData.features.length;
+}
+
+// ── CHOROPLETH ──────────────────────────────────────────────
+function buildChoropleth(){
+  if(choroLayer) map.removeLayer(choroLayer);
+  const ind = INDICATORS[currentIndicator];
+  const yearData = finData.indicators[String(currentYear)] || {};
+  const method = $('classMethod').value;
+  const nClasses = parseInt($('nbClasses').value);
+  const opacity = parseInt($('opacityRange').value)/100;
+
+  // Gather values for classification
+  const vals = Object.values(yearData).map(d=>d[currentIndicator]).filter(v=>v!=null);
+  const breaks = classify(vals, method, nClasses);
+
+  choroLayer = L.geoJSON(geoData,{
+    style: function(feature){
+      const iso = getIsoFromFeature(feature);
+      const d = iso ? yearData[iso] : null;
+      const val = d ? d[currentIndicator] : null;
+      return {
+        fillColor: val!=null ? getColor(val,ind.palette,breaks[0],breaks[breaks.length-1]) : '#21262d',
+        weight: 1.5,
+        color: '#30363d',
+        fillOpacity: val!=null ? opacity : 0.3,
+        opacity: 0.8,
+      };
+    },
+    onEachFeature: function(feature, layer){
+      const iso = getIsoFromFeature(feature);
+      const d = iso ? yearData[iso] : null;
+      layer.on({
+        mouseover: function(e){
+          e.target.setStyle({weight:3,color:'#e6edf3',fillOpacity:Math.min((opacity||0.7)+0.15,1)});
+          e.target.bringToFront();
+        },
+        mouseout: function(e){
+          if(choroLayer) choroLayer.resetStyle(e.target);
+        },
+        click: function(e){
+          const p = feature.properties;
+          const name = d ? d.pays : (p.NAME_FR||p.NAME||p.ADMIN);
+          const region = d ? d.region : (p.SUBREGION||'');
+          let html = `<div class="popup-title">${name}</div>`;
+          html += `<div class="popup-region">${region} | ${currentYear}</div>`;
+          html += '<div class="popup-grid">';
+          const show = ['pib_hab','croissance_pib','inflation','bancarisation','npl','credit_pib','pop_mm','score_inclusion'];
+          show.forEach(k=>{
+            const v = d?d[k]:null;
+            const cfg = INDICATORS[k];
+            if(cfg) html+=`<div class="popup-item"><span class="pk">${cfg[lang]||cfg.fr}</span><span class="pv">${fmt(v,cfg.dec)}</span></div>`;
+          });
+          html += '</div>';
+          if(iso && finData.country_ts[iso]){
+            html += `<button class="popup-btn" onclick="openDetail('${iso}')">Full details</button>`;
+          }
+          L.popup({maxWidth:320}).setLatLng(e.latlng).setContent(html).openOn(map);
+        }
+      });
+    }
+  }).addTo(map);
+
+  buildLegend(breaks, ind);
+  updateLabels();
+  updateCapitals();
+  updateCircles();
+  updateHeatmap();
+}
+
+// ── LEGEND ──────────────────────────────────────────────────
+function buildLegend(breaks, ind){
+  const el = $('legendContent');
+  if(!breaks.length){el.innerHTML='<div style="color:var(--text2);font-size:12px;">No data</div>';return;}
+  let html='';
+  const nClasses = breaks.length-1;
+  for(let i=nClasses-1;i>=0;i--){
+    const c1=getColor(breaks[i],ind.palette,breaks[0],breaks[breaks.length-1]);
+    const c2=getColor(breaks[i+1],ind.palette,breaks[0],breaks[breaks.length-1]);
+    const mid=lerpColor(c1,c2,0.5);
+    html+=`<div class="legend-item"><div class="legend-color" style="background:${mid};"></div>`;
+    html+=`<span>${fmt(breaks[i],ind.dec)} - ${fmt(breaks[i+1],ind.dec)} ${ind.unit}</span></div>`;
+  }
+  html+=`<div class="legend-item" style="margin-top:6px;"><div class="legend-color" style="background:#21262d;"></div><span style="color:var(--text2);">No data</span></div>`;
+  el.innerHTML=html;
+}
+
+// ── LABELS LAYER ────────────────────────────────────────────
+function updateLabels(){
+  labelsLayer.clearLayers();
+  if(!$('chkLabels').checked) return;
+  geoData.features.forEach(f=>{
+    const p=f.properties;
+    const x=p.LABEL_X,y=p.LABEL_Y;
+    if(x&&y){
+      const name=p.NAME||p.ADMIN||'';
+      const icon=L.divIcon({className:'',html:`<div style="font-size:10px;color:#e6edf3;text-shadow:0 1px 3px #000,0 0 6px #000;white-space:nowrap;font-weight:500;pointer-events:none;">${name}</div>`,iconSize:null});
+      L.marker([y,x],{icon,interactive:false}).addTo(labelsLayer);
+    }
+  });
+  labelsLayer.addTo(map);
+}
+
+// ── CAPITALS LAYER ──────────────────────────────────────────
+function updateCapitals(){
+  capitalsLayer.clearLayers();
+  if(!$('chkCapitals').checked||!finData.profils) return;
+  Object.entries(finData.profils).forEach(([iso,p])=>{
+    if(p.lat&&p.lon&&p.capitale){
+      const icon = L.divIcon({className:'',html:`<div style="width:8px;height:8px;background:var(--accent2);border-radius:50%;border:2px solid #fff;box-shadow:0 0 6px rgba(88,166,255,.5);"></div>`,iconSize:[12,12],iconAnchor:[6,6]});
+      L.marker([p.lat,p.lon],{icon}).bindTooltip(p.capitale,{className:'measure-tooltip',direction:'top',offset:[0,-8]}).addTo(capitalsLayer);
+    }
+  });
+  capitalsLayer.addTo(map);
+}
+
+// ── CIRCLES LAYER ───────────────────────────────────────────
+function updateCircles(){
+  circlesLayer.clearLayers();
+  if(!$('chkCircles').checked) return;
+  const yearData = finData.indicators[String(currentYear)]||{};
+  const ind = INDICATORS[currentIndicator];
+  const vals = Object.values(yearData).map(d=>d[currentIndicator]).filter(v=>v!=null&&v>0);
+  if(!vals.length) return;
+  const maxVal = Math.max(...vals);
+  geoData.features.forEach(f=>{
+    const iso=getIsoFromFeature(f);
+    const d=iso?yearData[iso]:null;
+    const val=d?d[currentIndicator]:null;
+    if(val!=null&&val>0){
+      const p=f.properties;
+      const cx=p.LABEL_X,cy=p.LABEL_Y;
+      if(cx&&cy){
+        const r=Math.sqrt(val/maxVal)*40000+5000;
+        L.circle([cy,cx],{radius:r,fillColor:getColor(val,ind.palette,ind.range[0],ind.range[1]),fillOpacity:0.6,weight:1,color:'#e6edf3',opacity:0.5})
+          .bindTooltip(`${d.pays}: ${fmt(val,ind.dec)} ${ind.unit}`,{className:'measure-tooltip'})
+          .addTo(circlesLayer);
+      }
+    }
+  });
+  circlesLayer.addTo(map);
+}
+
+// ── HEATMAP LAYER ───────────────────────────────────────────
+function updateHeatmap(){
+  if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
+  if(!$('chkHeatmap').checked) return;
+  const yearData=finData.indicators[String(currentYear)]||{};
+  const pts=[];
+  geoData.features.forEach(f=>{
+    const iso=getIsoFromFeature(f);
+    const d=iso?yearData[iso]:null;
+    const val=d?d[currentIndicator]:null;
+    if(val!=null&&val>0){
+      const p=f.properties;
+      if(p.LABEL_Y&&p.LABEL_X) pts.push([p.LABEL_Y,p.LABEL_X,val]);
+    }
+  });
+  if(pts.length){
+    const mx=Math.max(...pts.map(p=>p[2]));
+    heatLayer=L.heatLayer(pts.map(p=>[p[0],p[1],p[2]/mx]),{radius:35,blur:25,maxZoom:8,gradient:{0.2:'#0d1117',0.4:'#5b3cc4',0.6:'#f59e0b',0.8:'#f85149',1:'#00e5a0'}}).addTo(map);
+  }
+}
+
+// ── DETAIL PANEL ────────────────────────────────────────────
+function openDetail(iso){
+  const panel=$('detailPanel');
+  const yd=finData.indicators[String(currentYear)]||{};
+  const d=yd[iso];
+  const ts=finData.country_ts[iso];
+  const prof=finData.profils?finData.profils[iso]:null;
+  if(!d) return;
+
+  $('dpCountry').textContent=d.pays;
+  $('dpRegion').textContent=(d.region||'')+' | '+currentYear;
+
+  // Stats
+  const stats=[
+    {k:'pib_hab',l:'GDP/cap'},{k:'croissance_pib',l:'Growth'},{k:'bancarisation',l:'Banking'},
+    {k:'npl',l:'NPL'},{k:'credit_pib',l:'Credit/GDP'},{k:'pop_mm',l:'Mobile Money'},
+    {k:'score_inclusion',l:'Inclusion'},{k:'inflation',l:'Inflation'}
+  ];
+  let sh='';
+  stats.forEach(s=>{
+    const v=d[s.k];
+    sh+=`<div class="dp-stat"><div class="ds-val">${fmt(v,1)}</div><div class="ds-label">${s.l}</div></div>`;
+  });
+  $('dpStats').innerHTML=sh;
+
+  // Charts
+  if(ts&&ts.annees.length){
+    buildDPChart1(ts);
+    buildDPChart2(ts);
+  }
+
+  // Profile
+  if(prof){
+    let pt='';
+    if(prof.monnaie) pt+=`<tr><td>Currency</td><td>${prof.monnaie}</td></tr>`;
+    if(prof.banque_centrale) pt+=`<tr><td>Central bank</td><td>${prof.banque_centrale}</td></tr>`;
+    if(prof.bourse) pt+=`<tr><td>Stock exchange</td><td>${prof.bourse}</td></tr>`;
+    if(prof.population) pt+=`<tr><td>Population (M)</td><td>${fmt(prof.population,1)}</td></tr>`;
+    $('dpProfileTable').innerHTML=pt;
+    $('dpProfile').style.display=pt?'block':'none';
+  } else {
+    $('dpProfile').style.display='none';
+  }
+
+  panel.classList.add('open');
+  map.closePopup();
+}
+
+function buildDPChart1(ts){
+  const ctx=$('dpChart1').getContext('2d');
+  if(dpChart1) dpChart1.destroy();
+  dpChart1=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:ts.annees,
+      datasets:[
+        {label:'GDP ($Bn)',data:ts.pib,borderColor:'#00e5a0',backgroundColor:'rgba(0,229,160,.1)',fill:true,tension:.3,yAxisID:'y',pointRadius:1},
+        {label:'Growth (%)',data:ts.croissance,borderColor:'#58a6ff',backgroundColor:'transparent',borderDash:[5,3],tension:.3,yAxisID:'y1',pointRadius:1}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8b949e',font:{size:10}},position:'bottom'}},
+      scales:{
+        x:{ticks:{color:'#8b949e',font:{size:9},maxTicksLimit:8},grid:{color:'#21262d'}},
+        y:{position:'left',ticks:{color:'#00e5a0',font:{size:9}},grid:{color:'#21262d'},title:{display:true,text:'GDP',color:'#8b949e',font:{size:9}}},
+        y1:{position:'right',ticks:{color:'#58a6ff',font:{size:9}},grid:{drawOnChartArea:false},title:{display:true,text:'%',color:'#8b949e',font:{size:9}}}
+      }
+    }
+  });
+}
+
+function buildDPChart2(ts){
+  const ctx=$('dpChart2').getContext('2d');
+  if(dpChart2) dpChart2.destroy();
+  dpChart2=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:ts.annees,
+      datasets:[
+        {label:'Banking (%)',data:ts.bancarisation,borderColor:'#a78bfa',tension:.3,pointRadius:1},
+        {label:'Mobile Money (%)',data:ts.pop_mm,borderColor:'#f472b6',tension:.3,pointRadius:1},
+        {label:'NPL (%)',data:ts.npl,borderColor:'#f85149',borderDash:[5,3],tension:.3,pointRadius:1}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8b949e',font:{size:10}},position:'bottom'}},
+      scales:{
+        x:{ticks:{color:'#8b949e',font:{size:9},maxTicksLimit:8},grid:{color:'#21262d'}},
+        y:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#21262d'}}
+      }
+    }
+  });
+}
+
+// ── ANALYTICS TAB ───────────────────────────────────────────
+function buildKPIs(){
+  const kpis=finData.kpis;
+  const items=[
+    {k:'pib_total',l:'PIB Total',u:'Mrd $',d:0},
+    {k:'croissance_avg',l:'Growth',u:'%',d:1},
+    {k:'bancarisation_avg',l:'Banking',u:'%',d:1},
+    {k:'npl_avg',l:'NPL',u:'%',d:1},
+    {k:'inflation_avg',l:'Inflation',u:'%',d:1},
+    {k:'fdi_total',l:'FDI Total',u:'Mrd $',d:1},
+    {k:'score_inclusion_avg',l:'Inclusion',u:'/10',d:1},
+    {k:'pop_mm_avg',l:'Mobile Money',u:'%',d:1},
+  ];
+  let h='';
+  items.forEach(i=>{
+    h+=`<div class="kpi-card"><div class="kpi-val">${fmt(kpis[i.k],i.d)}${i.u?'<small style="font-size:10px;color:var(--text2);"> '+i.u+'</small>':''}</div><div class="kpi-label">${i.l}</div></div>`;
+  });
+  $('kpiGrid').innerHTML=h;
+}
+
+function buildContinentChart(){
+  const ts=finData.timeseries;
+  const ctx=$('chartContinent').getContext('2d');
+  if(continentChart) continentChart.destroy();
+  continentChart=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:ts.map(t=>t.year),
+      datasets:[
+        {label:'Growth (%)',data:ts.map(t=>t.croissance),borderColor:'#00e5a0',tension:.3,pointRadius:1},
+        {label:'Inflation (%)',data:ts.map(t=>t.inflation),borderColor:'#f59e0b',tension:.3,pointRadius:1},
+        {label:'Banking (%)',data:ts.map(t=>t.bancarisation),borderColor:'#a78bfa',tension:.3,pointRadius:1},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8b949e',font:{size:10}},position:'bottom'}},
+      scales:{
+        x:{ticks:{color:'#8b949e',font:{size:9},maxTicksLimit:6},grid:{color:'#21262d'}},
+        y:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#21262d'}}
+      }
+    }
+  });
+}
+
+function buildTop10Chart(){
+  const yearData=finData.indicators[String(currentYear)]||{};
+  const entries=Object.entries(yearData).filter(([,d])=>d[currentIndicator]!=null).sort((a,b)=>b[1][currentIndicator]-a[1][currentIndicator]).slice(0,10);
+  const ctx=$('chartTop10').getContext('2d');
+  if(top10Chart) top10Chart.destroy();
+  const ind=INDICATORS[currentIndicator];
+  top10Chart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:entries.map(([,d])=>d.pays),
+      datasets:[{
+        data:entries.map(([,d])=>d[currentIndicator]),
+        backgroundColor:entries.map(([,d])=>REGION_COLORS[d.region]||'#58a6ff'),
+        borderRadius:4,
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#21262d'},title:{display:true,text:ind[lang]||ind.fr,color:'#8b949e',font:{size:9}}},
+        y:{ticks:{color:'#e6edf3',font:{size:9}},grid:{display:false}}
+      }
+    }
+  });
+}
+
+// ── RANKINGS ────────────────────────────────────────────────
+function buildRankings(){
+  const key=$('rankingSelect').value;
+  const rk=finData.rankings[key];
+  if(!rk) return;
+  let h='<div style="margin-bottom:10px;"><strong style="color:var(--accent);">Top 10</strong></div>';
+  h+='<table style="width:100%;margin-bottom:14px;">';
+  rk.top.forEach((r,i)=>{
+    h+=`<tr><td style="color:var(--text2);padding:3px 0;">${i+1}.</td><td style="padding:3px 4px;">${r.pays}</td><td style="text-align:right;font-weight:600;color:var(--accent);padding:3px 0;">${fmt(r.val,1)}</td></tr>`;
+  });
+  h+='</table>';
+  h+='<div style="margin-bottom:6px;"><strong style="color:var(--red);">Bottom 10</strong></div>';
+  h+='<table style="width:100%;">';
+  rk.bottom.forEach((r,i)=>{
+    h+=`<tr><td style="color:var(--text2);padding:3px 0;">${i+1}.</td><td style="padding:3px 4px;">${r.pays}</td><td style="text-align:right;font-weight:600;color:var(--red);padding:3px 0;">${fmt(r.val,1)}</td></tr>`;
+  });
+  h+='</table>';
+  $('rankingContent').innerHTML=h;
+}
+
+// ── SEARCH ──────────────────────────────────────────────────
+function initSearch(){
+  const input=$('searchInput');
+  const results=$('searchResults');
+  const yearData=finData.indicators[String(currentYear)]||{};
+  input.addEventListener('input',function(){
+    const q=this.value.toLowerCase().trim();
+    if(!q){results.classList.remove('active');return;}
+    let items=[];
+    Object.entries(yearData).forEach(([iso,d])=>{
+      if(d.pays.toLowerCase().includes(q)){
+        items.push({iso,name:d.pays,region:d.region||''});
+      }
+    });
+    if(!items.length){results.classList.remove('active');return;}
+    results.innerHTML=items.slice(0,10).map(i=>`<div class="sr-item" data-iso="${i.iso}"><span>${i.name}</span><span class="sr-region">${i.region}</span></div>`).join('');
+    results.classList.add('active');
+    results.querySelectorAll('.sr-item').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const iso=el.dataset.iso;
+        zoomToCountry(iso);
+        openDetail(iso);
+        results.classList.remove('active');
+        input.value='';
+      });
+    });
+  });
+  document.addEventListener('click',e=>{if(!e.target.closest('.search-box'))results.classList.remove('active');});
+}
+
+function zoomToCountry(iso){
+  if(!choroLayer) return;
+  choroLayer.eachLayer(layer=>{
+    const fiso=getIsoFromFeature(layer.feature);
+    if(fiso===iso){
+      map.fitBounds(layer.getBounds(),{padding:[30,30],maxZoom:7});
+    }
+  });
+}
+
+// ── MEASUREMENT ─────────────────────────────────────────────
+function startMeasure(mode){
+  measuring=true;
+  measureMode=mode;
+  measurePoints=[];
+  map.getContainer().style.cursor='crosshair';
+  $('btnMeasureDist').classList.toggle('active',mode==='line');
+  $('btnMeasureArea').classList.toggle('active',mode==='polygon');
+  map.on('click',onMeasureClick);
+  map.on('dblclick',onMeasureEnd);
+  map.doubleClickZoom.disable();
+}
+
+function onMeasureClick(e){
+  if(!measuring) return;
+  measurePoints.push([e.latlng.lng,e.latlng.lat]);
+  L.circleMarker(e.latlng,{radius:4,fillColor:'#00e5a0',fillOpacity:1,weight:1,color:'#fff'}).addTo(measureLayer);
+  if(measurePoints.length>1){
+    const last2=[measurePoints[measurePoints.length-2],measurePoints[measurePoints.length-1]];
+    const line=turf.lineString(last2);
+    const dist=turf.length(line,{units:'kilometers'});
+    L.polyline([
+      [last2[0][1],last2[0][0]],[last2[1][1],last2[1][0]]
+    ],{color:'#00e5a0',weight:2,dashArray:'6,4'}).addTo(measureLayer);
+    const mid=[(last2[0][1]+last2[1][1])/2,(last2[0][0]+last2[1][0])/2];
+    L.marker(mid,{icon:L.divIcon({className:'measure-tooltip',html:dist.toFixed(1)+' km',iconSize:null})}).addTo(measureLayer);
+  }
+}
+
+function onMeasureEnd(e){
+  if(!measuring) return;
+  L.DomEvent.stop(e);
+  if(measureMode==='polygon'&&measurePoints.length>2){
+    measurePoints.push(measurePoints[0]);
+    const poly=turf.polygon([measurePoints]);
+    const area=turf.area(poly);
+    const coords=measurePoints.map(p=>[p[1],p[0]]);
+    L.polygon(coords,{color:'#00e5a0',fillColor:'rgba(0,229,160,.2)',weight:2}).addTo(measureLayer);
+    const center=turf.centroid(poly);
+    const areaStr=area>1e6?(area/1e6).toFixed(1)+' km2':area.toFixed(0)+' m2';
+    L.marker([center.geometry.coordinates[1],center.geometry.coordinates[0]],{icon:L.divIcon({className:'measure-tooltip',html:areaStr,iconSize:null})}).addTo(measureLayer);
+  } else if(measureMode==='line'&&measurePoints.length>1){
+    const line=turf.lineString(measurePoints);
+    const total=turf.length(line,{units:'kilometers'});
+    const last=measurePoints[measurePoints.length-1];
+    L.marker([last[1],last[0]],{icon:L.divIcon({className:'measure-tooltip',html:'Total: '+total.toFixed(1)+' km',iconSize:null})}).addTo(measureLayer);
+  }
+  stopMeasure();
+}
+
+function stopMeasure(){
+  measuring=false;
+  measureMode=null;
+  measurePoints=[];
+  map.getContainer().style.cursor='';
+  map.off('click',onMeasureClick);
+  map.off('dblclick',onMeasureEnd);
+  map.doubleClickZoom.enable();
+  $('btnMeasureDist').classList.remove('active');
+  $('btnMeasureArea').classList.remove('active');
+}
+
+// ── DRAWING ─────────────────────────────────────────────────
+function initDraw(){
+  $('btnDrawPoly').addEventListener('click',()=>startDraw('polygon'));
+  $('btnDrawLine').addEventListener('click',()=>startDraw('polyline'));
+  $('btnDrawMarker').addEventListener('click',()=>startDraw('marker'));
+  $('btnDrawClear').addEventListener('click',()=>{drawnItems.clearLayers();});
+}
+
+function startDraw(type){
+  let handler;
+  if(type==='polygon') handler=new L.Draw.Polygon(map,{shapeOptions:{color:'#58a6ff',fillColor:'rgba(88,166,255,.2)'}});
+  else if(type==='polyline') handler=new L.Draw.Polyline(map,{shapeOptions:{color:'#58a6ff'}});
+  else handler=new L.Draw.Marker(map);
+  handler.enable();
+  map.once(L.Draw.Event.CREATED,function(e){
+    drawnItems.addLayer(e.layer);
+    if(e.layer.feature===undefined) e.layer.feature={type:'Feature',properties:{}};
+    // Calculate area/distance for drawn shapes
+    if(type==='polygon'){
+      const geo=e.layer.toGeoJSON();
+      const area=turf.area(geo);
+      const areaStr=area>1e6?(area/1e6).toFixed(1)+' km\u00B2':area.toFixed(0)+' m\u00B2';
+      e.layer.bindPopup('Area: '+areaStr).openPopup();
+    } else if(type==='polyline'){
+      const geo=e.layer.toGeoJSON();
+      const dist=turf.length(geo,{units:'kilometers'});
+      e.layer.bindPopup('Distance: '+dist.toFixed(2)+' km').openPopup();
+    }
+  });
+}
+
+// ── ATTRIBUTE TABLE ─────────────────────────────────────────
+function buildTable(){
+  const yearData=finData.indicators[String(currentYear)]||{};
+  const cols=['pays','region','pib_hab','croissance_pib','inflation','dette_publique','bancarisation','npl','credit_pib','pop_mm','score_inclusion','fdi_entrants'];
+  const labels={pays:'Country',region:'Region',pib_hab:'GDP/cap',croissance_pib:'Growth',inflation:'Inflation',dette_publique:'Debt/GDP',bancarisation:'Banking',npl:'NPL',credit_pib:'Credit/GDP',pop_mm:'Mobile Money',score_inclusion:'Inclusion',fdi_entrants:'FDI'};
+  $('tableYear').textContent=currentYear;
+  let th='<tr>';
+  cols.forEach(c=>{
+    th+=`<th data-col="${c}">${labels[c]||c} <i class="fas fa-sort" style="font-size:9px;margin-left:4px;"></i></th>`;
+  });
+  th+='</tr>';
+  $('dataTableHead').innerHTML=th;
+
+  let rows=Object.entries(yearData).map(([iso,d])=>{
+    const row={};
+    cols.forEach(c=>{row[c]=d[c];});
+    row._iso=iso;
+    return row;
+  });
+
+  // Sort
+  if(currentSort.col){
+    rows.sort((a,b)=>{
+      const va=a[currentSort.col],vb=b[currentSort.col];
+      if(va==null&&vb==null) return 0;
+      if(va==null) return 1;
+      if(vb==null) return -1;
+      if(typeof va==='string') return currentSort.asc?va.localeCompare(vb):vb.localeCompare(va);
+      return currentSort.asc?va-vb:vb-va;
+    });
+  }
+
+  let tb='';
+  rows.forEach(r=>{
+    tb+='<tr>';
+    cols.forEach(c=>{
+      const v=r[c];
+      if(typeof v==='number') tb+=`<td style="text-align:right;">${fmt(v,1)}</td>`;
+      else tb+=`<td>${v||'--'}</td>`;
+    });
+    tb+='</tr>';
+  });
+  $('dataTableBody').innerHTML=tb;
+
+  // Sort headers
+  $('dataTableHead').querySelectorAll('th').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const col=th.dataset.col;
+      if(currentSort.col===col) currentSort.asc=!currentSort.asc;
+      else{currentSort.col=col;currentSort.asc=true;}
+      buildTable();
+    });
+  });
+}
+
+function exportCSV(){
+  const yearData=finData.indicators[String(currentYear)]||{};
+  const cols=['pays','region','pib_hab','croissance_pib','inflation','dette_publique','bancarisation','npl','credit_pib','pop_mm','score_inclusion','fdi_entrants'];
+  let csv=cols.join(',')+'\n';
+  Object.values(yearData).forEach(d=>{
+    csv+=cols.map(c=>{const v=d[c];return v==null?'':v;}).join(',')+'\n';
+  });
+  downloadFile('africa_finance_'+currentYear+'.csv',csv,'text/csv');
+}
+
+function exportGeoJSON(){
+  if(!drawnItems||drawnItems.getLayers().length===0){
+    // Export choropleth data as GeoJSON
+    const fc=JSON.parse(JSON.stringify(geoData));
+    const yearData=finData.indicators[String(currentYear)]||{};
+    fc.features.forEach(f=>{
+      const iso=getIsoFromFeature(f);
+      if(iso&&yearData[iso]){
+        Object.assign(f.properties,yearData[iso]);
+      }
+    });
+    downloadFile('africa_finance_'+currentYear+'.geojson',JSON.stringify(fc,null,2),'application/json');
+  } else {
+    downloadFile('drawn_features.geojson',JSON.stringify(drawnItems.toGeoJSON(),null,2),'application/json');
+  }
+}
+
+function downloadFile(name,content,type){
+  const blob=new Blob([content],{type});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── QUERY / FILTER ──────────────────────────────────────────
+function runQuery(){
+  const indKey=$('queryIndicator').value;
+  const op=$('queryOp').value;
+  const val=parseFloat($('queryVal').value);
+  if(isNaN(val)) return;
+  const yearData=finData.indicators[String(currentYear)]||{};
+  const matchIsos=[];
+  Object.entries(yearData).forEach(([iso,d])=>{
+    const v=d[indKey];
+    if(v==null) return;
+    let match=false;
+    if(op==='gt') match=v>val;
+    else if(op==='lt') match=v<val;
+    else if(op==='gte') match=v>=val;
+    else if(op==='lte') match=v<=val;
+    if(match) matchIsos.push(iso);
+  });
+  $('queryCount').textContent=matchIsos.length+' countries match';
+  // Highlight on map
+  if(choroLayer){
+    choroLayer.eachLayer(layer=>{
+      const iso=getIsoFromFeature(layer.feature);
+      if(matchIsos.includes(iso)){
+        layer.setStyle({weight:3,color:'#e6edf3',dashArray:''});
+        layer.bringToFront();
+      } else {
+        layer.setStyle({weight:1,color:'#30363d',fillOpacity:0.15});
+      }
+    });
+  }
+}
+
+function clearQuery(){
+  $('queryCount').textContent='';
+  $('queryVal').value='';
+  if(choroLayer) buildChoropleth();
+}
+
+// ── ANIMATION / PLAYER ─────────────────────────────────────
+function togglePlay(){
+  if(playInterval){
+    clearInterval(playInterval);
+    playInterval=null;
+    $('btnPlay').innerHTML='<i class="fas fa-play"></i>';
+    $('btnPlay').classList.remove('playing');
+  } else {
+    $('btnPlay').innerHTML='<i class="fas fa-pause"></i>';
+    $('btnPlay').classList.add('playing');
+    playInterval=setInterval(()=>{
+      let y=currentYear+1;
+      if(y>2024) y=2000;
+      setYear(y);
+    },playSpeed);
+  }
+}
+
+function setYear(y){
+  currentYear=y;
+  $('yearRange').value=y;
+  $('yearVal').textContent=y;
+  $('yearDisplayVal').textContent=y;
+  buildChoropleth();
+  buildTop10Chart();
+}
+
+// ── POPULATE SELECTS ────────────────────────────────────────
+function populateIndicators(){
+  const sel=$('indicatorSelect');
+  const qsel=$('queryIndicator');
+  Object.entries(INDICATORS).forEach(([k,v])=>{
+    const opt=document.createElement('option');
+    opt.value=k;opt.textContent=v[lang]||v.fr;
+    sel.appendChild(opt);
+    qsel.appendChild(opt.cloneNode(true));
+  });
+  sel.value=currentIndicator;
+}
+
+// ── BASEMAP SWITCH ──────────────────────────────────────────
+function switchBasemap(key){
+  map.removeLayer(map._basemapLayer);
+  map._basemapLayer=L.tileLayer(BASEMAPS[key].url,{attribution:BASEMAPS[key].attr,maxZoom:18}).addTo(map);
+  map._basemapLayer.bringToBack();
+  document.querySelectorAll('.basemap-opt').forEach(el=>el.classList.toggle('active',el.dataset.bm===key));
+}
+
+// ── UI EVENTS ───────────────────────────────────────────────
+function initUI(){
+  // Sidebar tabs
+  document.querySelectorAll('.sidebar-tabs button').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.sidebar-tabs button').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      $(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Toggle sidebar
+  $('btnToggleSidebar').addEventListener('click',()=>$('sidebar').classList.toggle('collapsed'));
+
+  // Basemaps
+  document.querySelectorAll('.basemap-opt').forEach(el=>{
+    el.addEventListener('click',()=>switchBasemap(el.dataset.bm));
+  });
+
+  // Indicator select
+  $('indicatorSelect').addEventListener('change',function(){
+    currentIndicator=this.value;
+    buildChoropleth();
+    buildTop10Chart();
+  });
+
+  // Year slider
+  $('yearRange').addEventListener('input',function(){
+    setYear(parseInt(this.value));
+  });
+
+  // Opacity
+  $('opacityRange').addEventListener('input',function(){
+    $('opacityVal').textContent=this.value+'%';
+    buildChoropleth();
+  });
+
+  // Classes
+  $('classMethod').addEventListener('change',()=>buildChoropleth());
+  $('nbClasses').addEventListener('input',function(){
+    $('nbClassesVal').textContent=this.value;
+    buildChoropleth();
+  });
+
+  // Layer toggles
+  ['chkBorders','chkLabels','chkCapitals','chkCircles','chkHeatmap'].forEach(id=>{
+    $(id).addEventListener('change',()=>{
+      if(id==='chkLabels') updateLabels();
+      else if(id==='chkCapitals') updateCapitals();
+      else if(id==='chkCircles') updateCircles();
+      else if(id==='chkHeatmap') updateHeatmap();
+      else if(id==='chkBorders') {
+        if(choroLayer){
+          if($(id).checked) choroLayer.addTo(map);
+          else map.removeLayer(choroLayer);
+        }
+      }
+    });
+  });
+
+  // Measure
+  $('btnMeasureDist').addEventListener('click',()=>{if(measuring) stopMeasure(); else startMeasure('line');});
+  $('btnMeasureArea').addEventListener('click',()=>{if(measuring) stopMeasure(); else startMeasure('polygon');});
+  $('btnClearMeasure').addEventListener('click',()=>{measureLayer.clearLayers();stopMeasure();});
+
+  // Player
+  $('btnPlay').addEventListener('click',togglePlay);
+  $('btnPlayPrev').addEventListener('click',()=>{let y=currentYear-1;if(y<2000)y=2024;setYear(y);});
+  $('btnPlayNext').addEventListener('click',()=>{let y=currentYear+1;if(y>2024)y=2000;setYear(y);});
+
+  // Detail panel close
+  $('dpClose').addEventListener('click',()=>$('detailPanel').classList.remove('open'));
+
+  // Table
+  $('btnTable').addEventListener('click',()=>{buildTable();$('tableModal').classList.add('active');});
+  $('btnOpenTable').addEventListener('click',()=>{buildTable();$('tableModal').classList.add('active');});
+  $('tableClose').addEventListener('click',()=>$('tableModal').classList.remove('active'));
+  $('tableCloseBtn').addEventListener('click',()=>$('tableModal').classList.remove('active'));
+  $('tableModal').addEventListener('click',e=>{if(e.target===$('tableModal'))$('tableModal').classList.remove('active');});
+
+  // Export
+  $('btnExportCSV').addEventListener('click',exportCSV);
+  $('tableExportCSV').addEventListener('click',exportCSV);
+  $('btnExportGeo').addEventListener('click',exportGeoJSON);
+  $('btnExportGeoJSON').addEventListener('click',exportGeoJSON);
+
+  // Print
+  $('btnPrint').addEventListener('click',()=>window.print());
+
+  // Fullscreen
+  $('btnFullscreen').addEventListener('click',()=>{
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  });
+
+  // Language
+  $('btnLang').addEventListener('click',()=>{
+    lang=lang==='en'?'fr':'en';
+    $('btnLang').textContent=lang.toUpperCase();
+    updateI18n();
+    buildChoropleth();
+    buildTop10Chart();
+    buildKPIs();
+    buildRankings();
+  });
+
+  // Query
+  $('btnQuery').addEventListener('click',runQuery);
+  $('btnQueryClear').addEventListener('click',clearQuery);
+
+  // Rankings
+  $('rankingSelect').addEventListener('change',buildRankings);
+
+  // Draw
+  initDraw();
+}
+
+// ── INIT ────────────────────────────────────────────────────
+async function init(){
+  try{
+    initMap();
+    await loadData();
+    populateIndicators();
+    buildChoropleth();
+    buildKPIs();
+    buildContinentChart();
+    buildTop10Chart();
+    buildRankings();
+    initSearch();
+    initUI();
+    $('loader').classList.add('hidden');
+  }catch(err){
+    console.error(err);
+    $('loader').innerHTML=`<div style="color:var(--red);font-size:16px;text-align:center;"><i class="fas fa-exclamation-triangle" style="font-size:32px;display:block;margin-bottom:12px;"></i>Loading error<br><small style="color:var(--text2);">${err.message}</small></div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
